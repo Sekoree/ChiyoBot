@@ -67,8 +67,72 @@ namespace ChiyoBot
 
             _applicationCommands.SlashCommandErrored += Errored;
             _client.ComponentInteractionCreated += ComponentInteraction;
+            _client.ComponentInteractionCreated += VolumeInteraction;
+            _client.ComponentInteractionCreated += MoreInteraction;
 
             _client.GuildDownloadCompleted += Ready;
+        }
+
+        private async Task MoreInteraction(DiscordClient sender, ComponentInteractionCreateEventArgs e)
+        {
+            if (e.Message.Id != InitMessage.Id || !e.Id.StartsWith("moreMenu"))
+                return;
+            var con = this._lavalink.GetGuildConnection(e.Guild);
+            if (con == default)
+                return;
+            //Fuck
+            switch (e.Id)
+            {
+                case "moreMenu_Repeat":
+                    if (PlaybackOpts.HasFlag(PlaybackOptions.RepeatOne))
+                        PlaybackOpts += 1;
+                    else if (PlaybackOpts.HasFlag(PlaybackOptions.RepeatAll))
+                        PlaybackOpts -= 2;
+                    else
+                        PlaybackOpts += 1;
+                    break;
+                case "moreMenu_Shuffle":
+                    if (PlaybackOpts.HasFlag(PlaybackOptions.Shuffle))
+                        PlaybackOpts -= 4;
+                    else
+                        PlaybackOpts += 4;
+                    break;
+                default:
+                    break;
+            }
+            await InitMessage.ModifyAsync(Constants.GetModesMessage()
+                       .AddComponents(Constants.GetMoreNavButtons()));
+            await e.Interaction.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource);
+        }
+
+        private async Task VolumeInteraction(DiscordClient sender, ComponentInteractionCreateEventArgs e)
+        {
+            if (e.Message.Id != InitMessage.Id || !e.Id.StartsWith("volMenu"))
+                return;
+            var con = this._lavalink.GetGuildConnection(e.Guild);
+            if (con == default)
+                return;
+            switch (e.Id)
+            {
+                case "volMenu_VolDown5":
+                    Volume -= 5;
+                    break;
+                case "volMenu_VolDown1":
+                    Volume--;
+                    break;
+                case "volMenu_VolUp1":
+                    Volume++;
+                    break;
+                case "volMenu_VolUp5":
+                    Volume += 5;
+                    break;
+                default:
+                    break;
+            }
+            await con.SetVolumeAsync(Volume);
+            await InitMessage.ModifyAsync(Constants.GetVolumeMessage()
+                        .AddComponents(Constants.GetVolNavButtons()));
+            await e.Interaction.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource);
         }
 
         private async Task ComponentInteraction(DiscordClient sender, ComponentInteractionCreateEventArgs e)
@@ -178,7 +242,8 @@ namespace ChiyoBot
                     break;
             }
             Skip = false;
-            //TODO: Update Message
+            await InitMessage.ModifyAsync(Constants.GetMainMessage()
+                .AddComponents(Constants.GetMainNavButtons()));
         }
 
         private async Task Errored(ApplicationCommandsExtension sender, SlashCommandErrorEventArgs e)

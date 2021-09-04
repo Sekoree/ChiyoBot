@@ -156,6 +156,8 @@ namespace ChiyoBot.Commands
                 await ctx.DeleteResponseAsync();
             else
                 await ctx.DeleteFollowupAsync(fmMsg.Id);
+            await Bot.InitMessage.ModifyAsync(Constants.GetMainMessage()
+                .AddComponents(Constants.GetMainNavButtons()));
         }
 
         //[SlashCommand("pause", "Pause playback")]

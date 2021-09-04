@@ -15,8 +15,9 @@ namespace ChiyoBot
             var dmb = new DiscordMessageBuilder();
             var embld = new DiscordEmbedBuilder();
             embld.WithTitle("Now Playing");
-            embld.AddField($"{Bot.CurrentSong.Track.Title}",
-                $"{Bot.CurrentSong.Track.Author} [{Bot.CurrentSong.Track.Length.ToString(@"mm\:ss")}]");
+            if (Bot.CurrentSong != default)
+                embld.AddField($"{Bot.CurrentSong.Track.Title}",
+                    $"{Bot.CurrentSong.Track.Author} [{Bot.CurrentSong.Track.Length.ToString(@"mm\:ss")}]");
             embld.AddField("Playback", $"Volume: {Bot.Volume}%\n" +
                 $"Paused? {Bot.Paused}\n" +
                 $"Modes enabled: {Bot.PlaybackOpts}");
@@ -66,8 +67,8 @@ namespace ChiyoBot
 
         public static DiscordComponent[] GetMoreNavButtons()
         {
-            var btn1 = new DiscordButtonComponent(ButtonStyle.Secondary, "moreMenu_repeat", "Repeat");
-            var btn2 = new DiscordButtonComponent(ButtonStyle.Secondary, "moremenu_shuffle", "Shuffle");
+            var btn1 = new DiscordButtonComponent(ButtonStyle.Secondary, "moreMenu_Repeat", "Repeat");
+            var btn2 = new DiscordButtonComponent(ButtonStyle.Secondary, "moreMenu_Shuffle", "Shuffle");
             var btn3 = new DiscordButtonComponent(ButtonStyle.Secondary, "back", "Back");
             return new[] { btn1, btn2, btn3 };
         }
