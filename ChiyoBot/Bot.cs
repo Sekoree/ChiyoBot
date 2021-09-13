@@ -20,17 +20,6 @@ namespace ChiyoBot
 {
     public class Bot
     {
-        //Only serving 1 guild so eh...
-        public static SongEntry CurrentSong { get; set; } = default;
-        public static DiscordMessage InitMessage { get; set; } = default;
-        public static List<SongEntry> SongQueue { get; set; } = new();
-        public static PlaybackOptions PlaybackOpts { get; set; } = PlaybackOptions.None;
-        public static bool Paused { get; set; } = false;
-        public static bool Skip { get; set; } = false;
-        public static int Volume { get; set; } = 100;
-        
-        static Random _rng = new Random();
-
         private DiscordClient _client { get;set; }
         private CommandsNextExtension _commandsNext { get; set; }
         private InteractivityExtension _interactivity { get; set; }
@@ -63,130 +52,6 @@ namespace ChiyoBot
             //_applicationCommands.RegisterCommands<_Clear>(882677524990140427);
             //_applicationCommands.RegisterCommands<DebugCommands>(676502231377510420);
             //_applicationCommands.RegisterCommands<_Clear>(676502231377510420);
-            _applicationCommands.RegisterCommands<MusicCommands>(676502231377510420);
-
-            _applicationCommands.SlashCommandErrored += Errored;
-            _client.ComponentInteractionCreated += ComponentInteraction;
-            _client.ComponentInteractionCreated += VolumeInteraction;
-            _client.ComponentInteractionCreated += MoreInteraction;
-
-            _client.GuildDownloadCompleted += Ready;
-        }
-
-        private async Task MoreInteraction(DiscordClient sender, ComponentInteractionCreateEventArgs e)
-        {
-            if (e.Message.Id != InitMessage.Id || !e.Id.StartsWith("moreMenu"))
-                return;
-            var con = this._lavalink.GetGuildConnection(e.Guild);
-            if (con == default)
-                return;
-            //Fuck
-            switch (e.Id)
-            {
-                case "moreMenu_Repeat":
-                    if (PlaybackOpts.HasFlag(PlaybackOptions.RepeatOne))
-                        PlaybackOpts += 1;
-                    else if (PlaybackOpts.HasFlag(PlaybackOptions.RepeatAll))
-                        PlaybackOpts -= 2;
-                    else
-                        PlaybackOpts += 1;
-                    break;
-                case "moreMenu_Shuffle":
-                    if (PlaybackOpts.HasFlag(PlaybackOptions.Shuffle))
-                        PlaybackOpts -= 4;
-                    else
-                        PlaybackOpts += 4;
-                    break;
-                default:
-                    break;
-            }
-            await InitMessage.ModifyAsync(Constants.GetModesMessage()
-                       .AddComponents(Constants.GetMoreNavButtons()));
-            await e.Interaction.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource);
-        }
-
-        private async Task VolumeInteraction(DiscordClient sender, ComponentInteractionCreateEventArgs e)
-        {
-            if (e.Message.Id != InitMessage.Id || !e.Id.StartsWith("volMenu"))
-                return;
-            var con = this._lavalink.GetGuildConnection(e.Guild);
-            if (con == default)
-                return;
-            switch (e.Id)
-            {
-                case "volMenu_VolDown5":
-                    Volume -= 5;
-                    break;
-                case "volMenu_VolDown1":
-                    Volume--;
-                    break;
-                case "volMenu_VolUp1":
-                    Volume++;
-                    break;
-                case "volMenu_VolUp5":
-                    Volume += 5;
-                    break;
-                default:
-                    break;
-            }
-            await con.SetVolumeAsync(Volume);
-            await InitMessage.ModifyAsync(Constants.GetVolumeMessage()
-                        .AddComponents(Constants.GetVolNavButtons()));
-            await e.Interaction.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource);
-        }
-
-        private async Task ComponentInteraction(DiscordClient sender, ComponentInteractionCreateEventArgs e)
-        {
-            if (e.Message.Id != InitMessage.Id)
-                return;
-            var con = this._lavalink.GetGuildConnection(e.Guild);
-            if (con == default)
-                return;
-            switch (e.Id)
-            {
-                case "playpause":
-                    _ = Task.Run(async () => await PlayPauseAsync(con));
-                    await e.Interaction.CreateResponseAsync( InteractionResponseType.ChannelMessageWithSource);
-                    break;
-                case "skip":
-                    _ = Task.Run(async () => await SkipAsync(con));
-                    await e.Interaction.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource);
-                    break;
-                case "volume":
-                    await InitMessage.ModifyAsync(Constants.GetVolumeMessage()
-                        .AddComponents(Constants.GetVolNavButtons()));
-                    await e.Interaction.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource);
-                    break;
-                case "more":
-                    await InitMessage.ModifyAsync(Constants.GetModesMessage()
-                        .AddComponents(Constants.GetMoreNavButtons()));
-                    await e.Interaction.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource);
-                    break;
-                case "back":
-                    await InitMessage.ModifyAsync(Constants.GetMainMessage()
-                        .AddComponents(Constants.GetMainNavButtons()));
-                    await e.Interaction.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource);
-                    break;
-                default:
-                    break;
-            }
-        }
-
-        public async Task PlayPauseAsync(LavalinkGuildConnection con)
-        {
-            if (Paused)
-                await con.ResumeAsync();
-            else
-                await con.PauseAsync();
-            //TODO: Message
-            Paused = !Paused;
-        }
-
-        public async Task SkipAsync(LavalinkGuildConnection con)
-        {
-            Skip = true;
-            //TODO: Message
-            await con.StopAsync();
         }
 
         private async Task Ready(DiscordClient sender, GuildDownloadCompletedEventArgs e)
@@ -194,63 +59,8 @@ namespace ChiyoBot
             _ = Task.Run(async () =>
             {
                 var node = await _lavalink.ConnectAsync(new LavalinkConfiguration());
-                node.PlaybackFinished += LL_PlaybackFinished;
             });
             await Task.Delay(0);
-        }
-
-        private async Task LL_PlaybackFinished(LavalinkGuildConnection sender, TrackFinishEventArgs e)
-        {
-            var next = SongQueue.FirstOrDefault();
-            if (e.Reason == TrackEndReason.Stopped && CurrentSong != default && !Skip)
-                return;
-
-            if (next == default && (PlaybackOpts != PlaybackOptions.RepeatAll || PlaybackOpts != PlaybackOptions.RepeatOne) && CurrentSong != default)
-            {
-                CurrentSong = default;
-                return;
-            }
-            switch (PlaybackOpts)
-            {
-                case PlaybackOptions.None:
-                    CurrentSong = next;
-                    SongQueue.Remove(next);
-                    await e.Player.PlayAsync(CurrentSong.Track);
-                    break;
-                case PlaybackOptions.RepeatOne:
-                    await e.Player.PlayAsync(CurrentSong.Track);
-                    break;
-                case PlaybackOptions.RepeatAll:
-                    SongQueue.Add(CurrentSong);
-                    CurrentSong = next;
-                    SongQueue.RemoveAt(0);
-                    await e.Player.PlayAsync(CurrentSong.Track);
-                    break;
-                case (PlaybackOptions)6:
-                    next = SongQueue[_rng.Next(0, SongQueue.Count)];
-                    CurrentSong = next;
-                    await e.Player.PlayAsync(CurrentSong.Track);
-                    break;
-                case PlaybackOptions.Shuffle:
-                    next = SongQueue[_rng.Next(0, SongQueue.Count)];
-                    CurrentSong = next;
-                    SongQueue.Remove(next);
-                    await e.Player.PlayAsync(CurrentSong.Track);
-                    break;
-                default:
-                    CurrentSong = default;
-                    break;
-            }
-            Skip = false;
-            await InitMessage.ModifyAsync(Constants.GetMainMessage()
-                .AddComponents(Constants.GetMainNavButtons()));
-        }
-
-        private async Task Errored(ApplicationCommandsExtension sender, SlashCommandErrorEventArgs e)
-        {
-            Console.WriteLine(e.Exception);
-            await e.Context.EditResponseAsync(new DiscordWebhookBuilder().AddEmbed(new DiscordEmbedBuilder().WithTitle("Error").WithDescription(e.Exception.ToString())));
-            //return Task.CompletedTask;
         }
 
         public async Task RunAsync()
@@ -261,15 +71,6 @@ namespace ChiyoBot
         public async Task StopAsync()
         {
             await _client.DisconnectAsync();
-        }
-
-        [Flags]
-        public enum PlaybackOptions
-        {
-            None = 0,
-            RepeatOne = 1,
-            RepeatAll = 2,
-            Shuffle = 4
         }
 
         /*
